@@ -2,6 +2,8 @@
 
 This project is a python implementation of the Gaussian Splats Optimization process, as described in [3D Gaussian Splatting for Real-Time Radiance Field Rendering](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/). We previously wrote a [CUDA renderer](https://github.com/etienne-p/CUDAGaussianRenderer) and an [RTX raytracer](https://github.com/etienne-p/OptixGaussianRenderer) for Gaussian Splats. After having focused on Gaussian Splats **rendering**, we now move on to the **optimization** process, by which Gaussian Splats are evaluated iteratively based on a set of views.
 
+![Application](images/screenshot.png)
+
 ## Goals & Assumptions
 
 The purpose of this project is to help us develop an understanding of the process. It is educational in nature.  To make it simpler, we make a couple of assumptions:
