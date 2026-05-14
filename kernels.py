@@ -71,20 +71,21 @@ def inv_grad(P, G):
     """
     return -P @ G @ P
 
+
 _4PI = 4 * np.pi
 
 # Normalization constants for Cartesian real SH Y_l^m, keyed by (l, m).
 # Derived from sqrt(rational/pi); add entries here to support higher degrees.
 _SH_CONST: dict[tuple[int, int], float] = {
-    (0,  0): np.sqrt( 1 / _4PI),
-    (1, -1): np.sqrt( 3 / _4PI),
-    (1,  0): np.sqrt( 3 / _4PI),
-    (1,  1): np.sqrt( 3 / _4PI),
+    (0, 0): np.sqrt(1 / _4PI),
+    (1, -1): np.sqrt(3 / _4PI),
+    (1, 0): np.sqrt(3 / _4PI),
+    (1, 1): np.sqrt(3 / _4PI),
     (2, -2): np.sqrt(15 / _4PI),
     (2, -1): np.sqrt(15 / _4PI),
-    (2,  0): np.sqrt( 5 / _4PI) / 2,
-    (2,  1): np.sqrt(15 / _4PI),
-    (2,  2): np.sqrt(15 / _4PI) / 2,
+    (2, 0): np.sqrt(5 / _4PI) / 2,
+    (2, 1): np.sqrt(15 / _4PI),
+    (2, 2): np.sqrt(15 / _4PI) / 2,
 }
 
 
@@ -120,16 +121,24 @@ def sh_basis(l, m, d):
     if l == 0:
         return np.full(d.shape[:-1], c)
     if l == 1:
-        if m == -1: return c * d[..., 1]  # ~ y
-        if m ==  0: return c * d[..., 2]  # ~ z
-        if m ==  1: return c * d[..., 0]  # ~ x
+        if m == -1:
+            return c * d[..., 1]  # ~ y
+        if m == 0:
+            return c * d[..., 2]  # ~ z
+        if m == 1:
+            return c * d[..., 0]  # ~ x
     if l == 2:
         x, y, z = d[..., 0], d[..., 1], d[..., 2]
-        if m == -2: return c * x * y
-        if m == -1: return c * y * z
-        if m ==  0: return c * (2*z*z - x*x - y*y)
-        if m ==  1: return c * x * z
-        if m ==  2: return c * (x*x - y*y)
+        if m == -2:
+            return c * x * y
+        if m == -1:
+            return c * y * z
+        if m == 0:
+            return c * (2 * z * z - x * x - y * y)
+        if m == 1:
+            return c * x * z
+        if m == 2:
+            return c * (x * x - y * y)
     raise NotImplementedError(f"sh_basis not implemented for l={l}, m={m}")
 
 
@@ -193,6 +202,9 @@ def quat_grad_from_rot_grad(q, dL_dR):
     """
     Gradient of loss w.r.t. unit quaternion q, given dL/dR.
 
+    Derived from dL/dq_i = <dL_dR, dR/dq_i>_F (Frobenius inner product),
+    which reduces to 2 * M(dL_dR) @ q for the symmetric 4x4 matrix M below.
+
     PARAMETERS
     q     : (4,), unit quaternion [x, y, z, w]
     dL_dR : (3, 3), dL/dR
@@ -200,43 +212,28 @@ def quat_grad_from_rot_grad(q, dL_dR):
     RETURNS
     (4,), [dL/dx, dL/dy, dL/dz, dL/dw]
     """
-    x, y, z, w = q
-    dL_dw = 2 * (
-        -dL_dR[0, 1] * z
-        + dL_dR[0, 2] * y
-        + dL_dR[1, 0] * z
-        - dL_dR[1, 2] * x
-        - dL_dR[2, 0] * y
-        + dL_dR[2, 1] * x
+    G = dL_dR
+    M = np.array(
+        [
+            [
+                -2 * (G[1, 1] + G[2, 2]),
+                G[0, 1] + G[1, 0],
+                G[0, 2] + G[2, 0],
+                G[2, 1] - G[1, 2],
+            ],
+            [
+                G[0, 1] + G[1, 0],
+                -2 * (G[0, 0] + G[2, 2]),
+                G[1, 2] + G[2, 1],
+                G[0, 2] - G[2, 0],
+            ],
+            [
+                G[0, 2] + G[2, 0],
+                G[1, 2] + G[2, 1],
+                -2 * (G[0, 0] + G[1, 1]),
+                G[1, 0] - G[0, 1],
+            ],
+            [G[2, 1] - G[1, 2], G[0, 2] - G[2, 0], G[1, 0] - G[0, 1], 0],
+        ]
     )
-    dL_dx = 2 * (
-        dL_dR[0, 1] * y
-        + dL_dR[0, 2] * z
-        + dL_dR[1, 0] * y
-        - 2 * dL_dR[1, 1] * x
-        - dL_dR[1, 2] * w
-        + dL_dR[2, 0] * z
-        + dL_dR[2, 1] * w
-        - 2 * dL_dR[2, 2] * x
-    )
-    dL_dy = 2 * (
-        -2 * dL_dR[0, 0] * y
-        + dL_dR[0, 1] * x
-        + dL_dR[0, 2] * w
-        + dL_dR[1, 0] * x
-        + dL_dR[1, 2] * z
-        - dL_dR[2, 0] * w
-        + dL_dR[2, 1] * z
-        - 2 * dL_dR[2, 2] * y
-    )
-    dL_dz = 2 * (
-        -2 * dL_dR[0, 0] * z
-        - dL_dR[0, 1] * w
-        + dL_dR[0, 2] * x
-        + dL_dR[1, 0] * w
-        - 2 * dL_dR[1, 1] * z
-        + dL_dR[1, 2] * y
-        + dL_dR[2, 0] * x
-        + dL_dR[2, 1] * y
-    )
-    return np.array([dL_dx, dL_dy, dL_dz, dL_dw])
+    return 2 * M @ q
