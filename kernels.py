@@ -18,6 +18,7 @@ def gaussian_kernel(P, q):
 def congruence(R, X):
     """
     Congruence transformation R X R^T.
+    Transforming a matrix X by a change of basis R.
 
     PARAMETERS
     R : (N, N), transformation matrix
@@ -69,6 +70,8 @@ def inv_grad(P, G):
     RETURNS
     (N, N), -P G P
     """
+    # Inverting a matrix reverses the direction of any perturbation to its input.
+    # For us, P is the precision matrix, inverse of covariance, symmetric.
     return -P @ G @ P
 
 
@@ -177,10 +180,11 @@ def sh_grad(sh_coeffs, d, dL_dcolor):
     return grad
 
 
-# TODO: remove and just use scipy.spatial?
 def quat_to_matrix(q):
     """
     Convert unit quaternion to rotation matrix.
+    The matrix form of Rodrigues' rotation formula,
+    R is a linear function of the outer products of q's components.
 
     PARAMETERS
     q : (4,), unit quaternion [x, y, z, w]
@@ -189,51 +193,52 @@ def quat_to_matrix(q):
     (3, 3), rotation matrix R(q)
     """
     x, y, z, w = q
-    return np.array(
-        [
-            [1 - 2 * (y**2 + z**2), 2 * (x * y - w * z), 2 * (x * z + w * y)],
-            [2 * (x * y + w * z), 1 - 2 * (x**2 + z**2), 2 * (y * z - w * x)],
-            [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x**2 + y**2)],
-        ]
-    )
+    v = np.array([x, y, z])
+
+    I = np.eye(3)
+    vvT = np.outer(v, v)
+    skew = np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]])
+
+    return (w**2 - v @ v) * I + 2 * vvT + 2 * w * skew
 
 
 def quat_grad_from_rot_grad(q, dL_dR):
     """
     Gradient of loss w.r.t. unit quaternion q, given dL/dR.
-
-    Derived from dL/dq_i = <dL_dR, dR/dq_i>_F (Frobenius inner product),
-    which reduces to 2 * M(dL_dR) @ q for the symmetric 4x4 matrix M below.
+    The gradient is a projection via Frobenius inner product onto each of
+    the derivative matrices of the matrix form of Rodrigues' rotation formula.
 
     PARAMETERS
     q     : (4,), unit quaternion [x, y, z, w]
-    dL_dR : (3, 3), dL/dR
+    dL_dR : (..., 3, 3), dL/dR — scalar (3,3) or any batch shape
 
     RETURNS
-    (4,), [dL/dx, dL/dy, dL/dz, dL/dw]
+    (..., 4), [dL/dx, dL/dy, dL/dz, dL/dw]
     """
-    G = dL_dR
-    M = np.array(
-        [
-            [
-                -2 * (G[1, 1] + G[2, 2]),
-                G[0, 1] + G[1, 0],
-                G[0, 2] + G[2, 0],
-                G[2, 1] - G[1, 2],
-            ],
-            [
-                G[0, 1] + G[1, 0],
-                -2 * (G[0, 0] + G[2, 2]),
-                G[1, 2] + G[2, 1],
-                G[0, 2] - G[2, 0],
-            ],
-            [
-                G[0, 2] + G[2, 0],
-                G[1, 2] + G[2, 1],
-                -2 * (G[0, 0] + G[1, 1]),
-                G[1, 0] - G[0, 1],
-            ],
-            [G[2, 1] - G[1, 2], G[0, 2] - G[2, 0], G[1, 0] - G[0, 1], 0],
-        ]
-    )
-    return 2 * M @ q
+    x, y, z, w = q
+    v = np.array([x, y, z])
+
+    I = np.eye(3)
+    skew = np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]])
+
+    dR_dw = 2 * w * I + 2 * skew
+
+    dskew_dx = np.array([[0, 0, 0], [0, 0, -1], [0, 1, 0]])
+    dskew_dy = np.array([[0, 0, 1], [0, 0, 0], [-1, 0, 0]])
+    dskew_dz = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 0]])
+
+    def dR_dvi(ei, dskew_dvi):
+        return (
+            -2 * (v @ ei) * I
+            + 2 * (np.outer(v, ei) + np.outer(ei, v))
+            + 2 * w * dskew_dvi
+        )
+
+    dR_dx = dR_dvi(np.array([1, 0, 0]), dskew_dx)
+    dR_dy = dR_dvi(np.array([0, 1, 0]), dskew_dy)
+    dR_dz = dR_dvi(np.array([0, 0, 1]), dskew_dz)
+
+    def frob(B):
+        return (dL_dR * B).sum(axis=(-2, -1))
+
+    return np.stack([frob(dR_dx), frob(dR_dy), frob(dR_dz), frob(dR_dw)], axis=-1)

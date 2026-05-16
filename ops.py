@@ -19,19 +19,19 @@ class SHEvalOp:
 class ProjectGaussianOp:
     def forward(self, ctx):
         cov, mu = projected_gaussian_2d(
-            ctx["pos"], ctx["scale"], quat_to_matrix(ctx["q"]), ctx["view"]
+            ctx["position"], ctx["scale"], quat_to_matrix(ctx["rotation"]), ctx["view"]
         )
         ctx["precision"] = np.linalg.inv(cov)
         ctx["mu"] = mu
 
     def backward(self, ctx):
         dL_dpos, dL_dscale, dL_dq = grad_projected_gaussian_2d(
-            ctx["precision"], ctx["scale"], ctx["q"], ctx["view"],
+            ctx["precision"], ctx["scale"], ctx["rotation"], ctx["view"],
             ctx["precision_dL"], ctx["mu_dL"],
         )
-        ctx["pos_dL"] = dL_dpos
+        ctx["position_dL"] = dL_dpos
         ctx["scale_dL"] = dL_dscale
-        ctx["q_dL"] = dL_dq
+        ctx["rotation_dL"] = dL_dq
 
 
 class RasterizeGaussianOp:

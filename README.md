@@ -7,10 +7,10 @@ This project is a python implementation of the Gaussian Splats Optimization proc
 ## Goals & Assumptions
 
 The purpose of this project is to help us develop an understanding of the process. It is educational in nature.  To make it simpler, we make a couple of assumptions:
- * We use 3 orthogonal orthographic views. So we do not need the Jacobian matrix of a perspective projection. When evaluating Spherical Harmonics, the viewing direction is independent of the splat position.
+ * We use 3 orthogonal orthographic views. So we do not need the Jacobian matrix of a perspective projection. Because the orthogrpahic projection is affine (linear). When evaluating Spherical Harmonics, the viewing direction is independent of the splat position.
  * We optimize one splat at a time, based on a random splat used as a reference. The rasterized image from which we derive the error (that is backwards propagated) results from the rasterization of this reference splat.
- * Since we only use one splat, we need not worry about its contribution to the image nor its occlusion.
- * We only use the `L1` error term, and ignore the perceptual term used in the original implementation.
+ * In 3DGS, the gradient for a splat is accumulated across all the pixels it influences. Since we have just one splat, we can skip this step and propagate the global error directly to the splat parameters. We need not worry about the contribution of the splat to the image nor its occlusion, nor do we have an opacity factor.
+ * We only use the `L1` error term, and ignore the perceptual `D-SSIM` term used in the original implementation.
 
 ## Approach
 
@@ -24,7 +24,9 @@ Parameters are updated using the Adam optimizer, as in the original 3DGS paper. 
 
 ## Visualization
 
-On the left panel, we display the 3D scene and the 3 orthogonal projections used for optimization. On the right panel, we visualize the rasterized error for each view, and plot the integrated error over the optimization process.
+On the left panel, we display the 3D scene and the 3 orthogonal projections used for optimization. On the right panel, we visualize the rasterized error or attribution (either for position, scale, rotation or spherical harmonics) for each view, and plot the integrated error over the optimization process.
+
+_The attribution (for each parameter group) is a visualization of the spatial attribution of the gradient. The contribution of the error at a pixel to the gradient update. We can think of it as the sensitivity of the gradient to the error at each pixel. To compute attribution, one runs the backwards pass on a per pixel basis instead of aggregating error over the pixels covered by the splat._
 
 We have a toolbar to reset, pause, move on to the next frame, and resume the animation. We also have a toggle to display the reference splat.
 

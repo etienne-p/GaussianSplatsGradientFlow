@@ -6,20 +6,22 @@ from kernels import sh_eval
 
 _PANE_COLOR = "#4b4b4b"
 
-plt.rcParams.update({
-    "figure.facecolor": "black",
-    "axes.facecolor": "black",
-    "axes.edgecolor": _PANE_COLOR,
-    "axes.labelcolor": "white",
-    "axes.labelsize": 9,
-    "axes.titlecolor": "white",
-    "axes.titlesize": 9,
-    "text.color": "white",
-    "xtick.color": "white",
-    "ytick.color": "white",
-    "xtick.labelsize": 7,
-    "ytick.labelsize": 7,
-})
+plt.rcParams.update(
+    {
+        "figure.facecolor": "black",
+        "axes.facecolor": "black",
+        "axes.edgecolor": _PANE_COLOR,
+        "axes.labelcolor": "white",
+        "axes.labelsize": 9,
+        "axes.titlecolor": "white",
+        "axes.titlesize": 9,
+        "text.color": "white",
+        "xtick.color": "white",
+        "ytick.color": "white",
+        "xtick.labelsize": 7,
+        "ytick.labelsize": 7,
+    }
+)
 
 
 def create_ellipsoid(position, scale, rotation, res=40):
@@ -101,12 +103,15 @@ def draw_gaussian(ax, pos, scale, rotation, sh_coeffs, views, plane_offset, alph
     res = 40
     u = np.linspace(0, 2 * np.pi, res)
     v = np.linspace(0, np.pi, res // 2)
-    unit_dirs = np.stack([
-        np.outer(np.cos(u), np.sin(v)),
-        np.outer(np.sin(u), np.sin(v)),
-        np.outer(np.ones_like(u), np.cos(v)),
-    ], axis=-1)  # (res, res//2, 3) unit sphere normals in object space
-    world_dirs = unit_dirs @ rotation.T   # (res, res//2, 3) rotated to world space
+    unit_dirs = np.stack(
+        [
+            np.outer(np.cos(u), np.sin(v)),
+            np.outer(np.sin(u), np.sin(v)),
+            np.outer(np.ones_like(u), np.cos(v)),
+        ],
+        axis=-1,
+    )  # (res, res//2, 3) unit sphere normals in object space
+    world_dirs = unit_dirs @ rotation.T  # (res, res//2, 3) rotated to world space
     colors = np.clip(sh_eval(sh_coeffs, world_dirs), 0.0, 1.0)  # clip for display only
     rgba = np.concatenate(
         [colors, np.full(colors.shape[:2] + (1,), alpha)], axis=-1
@@ -114,44 +119,46 @@ def draw_gaussian(ax, pos, scale, rotation, sh_coeffs, views, plane_offset, alph
 
     Xs, Ys, Zs = create_ellipsoid(pos, scale, rotation, res=res)
     ax.plot_surface(
-        Xs, Ys, Zs,
+        Xs,
+        Ys,
+        Zs,
         facecolors=rgba,
-        rstride=1, cstride=1,
-        linewidth=0, antialiased=True, shade=False,
+        rstride=1,
+        cstride=1,
+        linewidth=0,
+        antialiased=True,
+        shade=False,
     )
 
     for view in views:
-        view_dir = view[2, :3]  # orthographic: constant viewing direction for all points
+        view_dir = view[
+            2, :3
+        ]  # orthographic: constant viewing direction for all points
         shadow_color = np.clip(sh_eval(sh_coeffs, view_dir), 0.0, 1.0)
         cov = ortho_proj_ellipse_matrix(scale, rotation, view)
-        draw_3d_projection(ax, view, np.linalg.inv(cov), -plane_offset,
-                           alpha=alpha * 0.5, proj_color=shadow_color)
-
-
-_BLUE_BLACK_RED = plt.matplotlib.colors.LinearSegmentedColormap.from_list(
-    "blue_black_red", ["blue", "black", "red"]
-)
-
-_VIEW_LABELS = ["XY", "XZ", "YZ"]
-
-
-def draw_l1_comparison(ax, diff, xs, ys, l1, label, vmax):
-    """Render one view's G2 − G1 signed diff as a diverging heatmap. Returns the image."""
-    extent = [xs[0], xs[-1], ys[0], ys[-1]]
-    im = ax.imshow(
-        diff, origin="lower", extent=extent, cmap=_BLUE_BLACK_RED, vmin=-vmax, vmax=vmax
-    )
-    ax.set_title(f"{label}  L1={l1:.3f}")
-    return im
+        draw_3d_projection(
+            ax,
+            view,
+            np.linalg.inv(cov),
+            -plane_offset,
+            alpha=alpha * 0.5,
+            proj_color=shadow_color,
+        )
 
 
 def draw_frame(
-    ax3d, ax_diffs, cax,
-    diffs, l1s, step, vmax,
-    pos1, scale1, R1, sh_coeffs_1,
-    pos2, scale2, R2, sh_coeffs_2,
-    views, plane_offset,
-    xs, ys,
+    ax3d,
+    step,
+    pos1,
+    scale1,
+    R1,
+    sh_coeffs_1,
+    pos2,
+    scale2,
+    R2,
+    sh_coeffs_2,
+    views,
+    plane_offset,
     show_ref=True,
 ):
     ax3d.cla()
@@ -163,10 +170,12 @@ def draw_frame(
     ax3d.zaxis.pane.set_edgecolor(_PANE_COLOR)
 
     if show_ref:
-        draw_gaussian(ax3d, pos1, scale1, R1, sh_coeffs_1,
-                      views=views, plane_offset=plane_offset)
-    draw_gaussian(ax3d, pos2, scale2, R2, sh_coeffs_2,
-                  views=views, plane_offset=plane_offset)
+        draw_gaussian(
+            ax3d, pos1, scale1, R1, sh_coeffs_1, views=views, plane_offset=plane_offset
+        )
+    draw_gaussian(
+        ax3d, pos2, scale2, R2, sh_coeffs_2, views=views, plane_offset=plane_offset
+    )
 
     ax3d.set_xlim(-plane_offset, plane_offset)
     ax3d.set_ylim(-plane_offset, plane_offset)
@@ -176,10 +185,3 @@ def draw_frame(
     ax3d.set_zlabel("Z")
     ax3d.set_title(f"Step {step}", fontsize=10, pad=8)
     ax3d.view_init(elev=25, azim=40)
-
-    im = None
-    for ax, diff, l1, label in zip(ax_diffs, diffs, l1s, _VIEW_LABELS):
-        ax.cla()
-        im = draw_l1_comparison(ax, diff, xs, ys, l1, label, vmax)
-    cax.cla()
-    plt.colorbar(im, cax=cax)
