@@ -28,7 +28,7 @@ On the left panel, we display the 3D scene and the 3 orthogonal projections used
 
 _The attribution (for each parameter group) is a visualization of the spatial attribution of the gradient. The contribution of the error at a pixel to the gradient update. We can think of it as the sensitivity of the gradient to the error at each pixel. To compute attribution, one runs the backwards pass on a per pixel basis instead of aggregating error over the pixels covered by the splat._
 
-We have a toolbar to reset, pause, move on to the next frame, and resume the animation. We also have a toggle to display the reference splat.
+We have a toolbar to reset, pause, move on to the next frame, and resume the animation. We also have a toggle to display the reference splat. On the bottom left, we have radio buttons to either visualize the `L1` error or the attributions per property group.
 
 _Note: gif encoding does introduce some artefacts._
 
