@@ -44,19 +44,45 @@ def cov_world(R, s):
     return R @ np.diag(s**2) @ R.T
 
 
-def schur_complement(A, b, d):
+# The schur complement can be used to compute an exact projection of the gaussian from 3D to 2D.
+# It would work for an orthographic projection. For a perspective projection,
+# it's an approximation that ignores the depth dependence of the projection.
+# That is, it ignores the vanishing of scale with depth.
+def schur_complement(M):
     """
-    Schur complement of d in the 3x3 block [[A, b], [b^T, d]].
+    Schur complement of the bottom-right element in a 3x3 block matrix.
 
     PARAMETERS
-    A : (2, 2)
-    b : (2,)
-    d : float
+    M : (3, 3), symmetric matrix partitioned as [[A, b], [b^T, d]]
 
     RETURNS
     (2, 2), A - b b^T / d
     """
-    return A - np.outer(b, b) / d
+    b = M[:2, 2]
+    d = M[2, 2]
+    return M[:2, :2] - np.outer(b, b) / d
+
+
+def grad_schur_complement(M, dL_dS):
+    """
+    Backprop through Schur complement S = A - outer(b, b) / d.
+
+    PARAMETERS
+    M     : (3, 3), the symmetric matrix [[A, b], [b^T, d]] from the forward pass
+    dL_dS : (..., 2, 2), upstream gradient (scalar or batched)
+
+    RETURNS
+    (..., 3, 3), dL/dM
+    """
+    b = M[:2, 2]  # (2,)
+    d = M[2, 2]  # scalar
+
+    dL_dM = np.zeros((*dL_dS.shape[:-2], 3, 3))
+    dL_dM[..., :2, :2] = dL_dS
+    dL_dM[..., :2, 2] = -(dL_dS + dL_dS.swapaxes(-1, -2)) @ b / d  # (..., 2)
+    dL_dM[..., 2, 2] = (dL_dS * np.outer(b, b)).sum(axis=(-2, -1)) / d**2  # (...)
+
+    return dL_dM
 
 
 def inv_grad(P, G):

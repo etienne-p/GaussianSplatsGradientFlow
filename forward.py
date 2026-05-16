@@ -2,31 +2,6 @@ import numpy as np
 from kernels import congruence, cov_world, schur_complement
 
 
-def ortho_proj_ellipse_matrix_with_schur(scale, rotation, view_matrix):
-    """
-    Orthographic projection of an ellipsoid; boundary via Schur complement.
-
-    NOTE: gives the geometric shadow boundary, whereas slicing the covariance
-    gives the marginal Gaussian and under-estimates spread when depth and plane
-    coordinates are correlated.
-
-    PARAMETERS
-    scale       : (3,), semi-axes lengths (a, b, c)
-    rotation    : (3, 3), rotation matrix of the ellipsoid
-    view_matrix : (4, 4), world-to-view transform; projection drops view-space z
-
-    RETURNS
-    A_proj : (2, 2), projected precision matrix  q^T A q = 1
-    """
-    R_v = view_matrix[:3, :3]  # (3, 3)
-    M = congruence(rotation, np.diag(1.0 / scale**2))  # (3, 3), world-space precision
-    M_v = congruence(R_v, M)  # (3, 3), view-space precision
-    A = M_v[:2, :2]  # (2, 2)
-    b = M_v[:2, 2]  # (2,)
-    d = M_v[2, 2]  # scalar
-    return schur_complement(A, b, d)  # (2, 2)
-
-
 def ortho_proj_ellipse_matrix(scale, rotation, view_matrix):
     """
     Orthographic projection of an ellipsoid; marginal covariance via slice.
@@ -45,7 +20,7 @@ def ortho_proj_ellipse_matrix(scale, rotation, view_matrix):
     return cov_v[:2, :2]  # (2, 2), marginal: slice top-left 2x2 (drop depth)
 
 
-def projected_gaussian_2d(pos, scale, rotation, view_matrix):
+def projected_gaussian_2d(pos, scale, rotation, view_matrix, use_schur=False):
     """
     Orthographic projection of a 3D Gaussian onto view's xy plane.
 
@@ -54,16 +29,19 @@ def projected_gaussian_2d(pos, scale, rotation, view_matrix):
     scale       : (3,), semi-axes lengths
     rotation    : (3, 3), rotation matrix
     view_matrix : (4, 4), world-to-view transform
+    use_schur   : bool, if True use the Schur complement (conditional covariance xy|z=0)
+                  rather than slicing the view-space covariance (marginal over depth)
 
     RETURNS
     cov_2d : (2, 2), projected 2D covariance
     mu_2d  : (2,), projected 2D mean
     """
-    cov_2d = ortho_proj_ellipse_matrix(scale, rotation, view_matrix)  # (2, 2)
-    # Isolate rotation+scale and translation
-    R_v = view_matrix[:3, :3]  # (3, 3)
-    t_v = view_matrix[:3, 3]  # (3,)
-    mu_2d = (R_v @ pos + t_v)[:2]  # (2,)
+    R_v = view_matrix[:3, :3]
+    t_v = view_matrix[:3, 3]
+    mu_2d = (R_v @ pos + t_v)[:2]
+    cov = cov_world(rotation, scale)
+    cov_v = congruence(R_v, cov)
+    cov_2d = schur_complement(cov_v) if use_schur else cov_v[:2, :2]
     return cov_2d, mu_2d
 
 

@@ -12,6 +12,8 @@ The purpose of this project is to help us develop an understanding of the proces
  * In 3DGS, the gradient for a splat is accumulated across all the pixels it influences. Since we have just one splat, we can skip this step and propagate the global error directly to the splat parameters. We need not worry about the contribution of the splat to the image nor its occlusion, nor do we have an opacity factor.
  * We only use the `L1` error term, and ignore the perceptual `D-SSIM` term used in the original implementation.
 
+_Note: within the code we have an optional codepath that uses the Schur complement to handle the projection of the covariance matrix. We added it out of curiosity, but it is only correct in the limited scope of our tool because we use orthographic projections. In the context of an actual 3DGS implementation, it would not make sense._
+
 ## Approach
 
 We write our prototype in python without much concern for performance. We are primarily interested in readability. We break down the computation into a set of kernels. These kernels are used by operations, each of which has a `forward` and a corresponding `backward` method. (Gradients computations are unit tested using finite differences.)
